@@ -1,4 +1,7 @@
 '''Train CIFAR10 with PyTorch.'''
+
+from accelerate import Accelerator
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -14,6 +17,9 @@ import argparse
 from models import *
 from utils import progress_bar
 
+accelerator = Accelerator()
+device = accelerator.device
+
 
 parser = argparse.ArgumentParser(description='PyTorch CIFAR10 Training')
 parser.add_argument('--lr', default=0.1, type=float, help='learning rate')
@@ -21,7 +27,7 @@ parser.add_argument('--resume', '-r', action='store_true',
                     help='resume from checkpoint')
 args = parser.parse_args()
 
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
 best_acc = 0  # best test accuracy
 start_epoch = 0  # start from epoch 0 or last checkpoint epoch
 
@@ -91,6 +97,10 @@ optimizer = optim.SGD(net.parameters(), lr=args.lr,
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=200)
 
 
+net, optimizer, trainloader, scheduler = accelerator.prepare(
+    net, optimizer, trainloader, scheduler
+)
+
 # Training
 def train(epoch):
     print('\nEpoch: %d' % epoch)
@@ -103,7 +113,8 @@ def train(epoch):
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, targets)
-        loss.backward()
+        # loss.backward()
+        accelerator.backward(loss)
         optimizer.step()
 
         train_loss += loss.item()
